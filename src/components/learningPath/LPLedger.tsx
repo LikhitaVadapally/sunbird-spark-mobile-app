@@ -6,6 +6,9 @@ import type { ViewerSummaryRecord } from '../../types/viewerServiceTypes';
 import { computeCourseProgress } from '../../services/learningPath/learningPathProgress';
 import LPStatusBadge from './LPStatusBadge';
 import LPCourseRow from './LPCourseRow';
+import { skillName as resolveName } from '../../services/skill/skillTree';
+
+const deslug = (code: string) => resolveName(undefined, code);
 
 interface LPLedgerProps {
   model: LearningPathModel;
@@ -26,6 +29,10 @@ interface LPLedgerProps {
   onOpenLevel: (levelId: string) => void;
   /** Opens the player at a course's first leaf. */
   onOpenCourse: (courseId: string, contentId: string) => void;
+  /** Codes held from any source (skill profile) - the same "gained" set My Skills uses. */
+  heldCodes?: ReadonlySet<string>;
+  /** Display name for a skill code; defaults to the mapper's de-slugged label. */
+  skillName?: (code: string) => string;
   t: LPTFunction;
 }
 
@@ -56,6 +63,8 @@ export const LPLedger: React.FC<LPLedgerProps> = ({
   onOpenOutcome,
   onOpenLevel,
   onOpenCourse,
+  heldCodes,
+  skillName,
   t,
 }) => {
   return (
@@ -123,11 +132,20 @@ export const LPLedger: React.FC<LPLedgerProps> = ({
                     );
                   })}
                 </div>
-                {level.skills.length > 0 && (
+                {level.skillCodes.length > 0 && (
                   <div className="lp-ledger-level-skills">
-                    {level.skills.map((skill) => (
-                      <span key={skill} className="lp-skill-chip">{skill}</span>
-                    ))}
+                    {level.skillCodes.map((code) => {
+                      const gained = heldCodes?.has(code) ?? false;
+                      return (
+                        <span
+                          key={code}
+                          className={`lp-skill-chip${gained ? ' lp-skill-chip--gained' : ''}`}
+                          data-testid={gained ? 'skill-chip-gained' : undefined}
+                        >
+                          {(skillName ?? deslug)(code)}
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
                 <button type="button" className="lp-ledger-open-level-btn" onClick={() => onOpenLevel(level.identifier)}>

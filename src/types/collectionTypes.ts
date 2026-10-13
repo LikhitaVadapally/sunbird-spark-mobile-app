@@ -26,9 +26,16 @@ export interface HierarchyContentNode {
   policy?: string;
   /** Ordering index for Level nodes under a Learning Path root. */
   index?: number;
+  /**
+   * `skill` is the COMPETENCY field: leaf term CODES such as "dosage-calculation". `se_skills` is
+   * the platform's search-enriched copy, read only as a fallback (see `services/skill/skillSource`).
+   * Codes are not display strings - resolve them through the framework before rendering.
+   */
   skill?: string[];
   se_skills?: string[];
-  competencies?: string[];
+  competencyFramework?: string;
+  /** Taxonomy framework the content was authored against (the source of its `skill` terms). */
+  framework?: string;
 }
 
 /** Root-level response from /course/v1/hierarchy/:id */

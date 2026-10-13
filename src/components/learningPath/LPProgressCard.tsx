@@ -13,11 +13,16 @@ interface LPProgressCardProps {
   progressPct: number;
   doneLevels: number;
   batchEndDate?: string;
+  /**
+   * Gained / (gained + pending) for this path by the My Skills rule (see `usePathSkills`), so
+   * the number matches My Skills. Absent while the profile loads - the stat then shows scope.
+   */
+  skillCounts?: { held: number; total: number };
   t: LPTFunction;
 }
 
 /** Overview hero: path progress bar plus a 2x2 stat grid (Policy / Levels / Courses / Skills). */
-export const LPProgressCard: React.FC<LPProgressCardProps> = ({ model, progressPct, doneLevels, batchEndDate, t }) => {
+export const LPProgressCard: React.FC<LPProgressCardProps> = ({ model, progressPct, doneLevels, batchEndDate, skillCounts, t }) => {
   return (
     <div className="lp-progress-card">
       <div className="lp-progress-card-header">
@@ -44,7 +49,9 @@ export const LPProgressCard: React.FC<LPProgressCardProps> = ({ model, progressP
         </div>
         <div className="lp-progress-stat">
           <span className="lp-progress-stat-label">{t('learningPath.skills')}</span>
-          <span className="lp-progress-stat-value">{model.allSkills.length}</span>
+          <span className="lp-progress-stat-value" data-testid="lp-progress-skills">
+            {skillCounts ? `${skillCounts.held}/${skillCounts.total}` : model.allSkillCodes.length || model.allSkills.length}
+          </span>
         </div>
       </div>
       {batchEndDate && (

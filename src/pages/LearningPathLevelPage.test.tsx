@@ -33,6 +33,26 @@ vi.mock('react-i18next', () => ({
 
 const { mockUseLearningPath } = vi.hoisted(() => ({ mockUseLearningPath: vi.fn() }));
 vi.mock('../hooks/useLearningPath', () => ({ useLearningPath: mockUseLearningPath }));
+
+const { mockUsePathSkills } = vi.hoisted(() => ({ mockUsePathSkills: vi.fn() }));
+vi.mock('../hooks/usePathSkills', () => ({ usePathSkills: mockUsePathSkills }));
+
+/** `usePathSkills` result: `held` codes are gained, `pending` still to do - the My Skills rule. */
+function pathSkills(held: string[] = [], pending: string[] = [], overrides: Record<string, unknown> = {}) {
+  const skills = [
+    ...held.map((code) => ({ code, state: 'held' as const })),
+    ...pending.map((code) => ({ code, state: 'pending' as const })),
+  ];
+  return {
+    summary: skills.length ? { skills, held: held.length, total: skills.length } : undefined,
+    heldCodes: new Set(held),
+    stateOf: (code: string) => skills.find((s) => s.code === code),
+    name: (code: string) => `name:${code}`,
+    isLoading: false,
+    isError: false,
+    ...overrides,
+  };
+}
 vi.mock('../services/learningPath/learningPathProgress', () => ({
   computeCourseProgress: vi.fn(() => ({ pct: 40, completed: 0, total: 2, status: 'active' })),
 }));
@@ -46,15 +66,18 @@ function baseLp(overrides: Record<string, unknown> = {}) {
           identifier: 'l1',
           name: 'Foundations',
           description: 'Learn the basics',
-          skills: ['Skill A'],
+          skills: ['Skill a'],
+          skillCodes: ['skill-a', 'skill-b'],
           courses: [
-            { identifier: 'c1', name: 'Course 1', leafNodesCount: 2, leafIds: ['r1', 'r2'], skills: ['Skill A'], isAssessmentCourse: false },
+            { identifier: 'c1', name: 'Course 1', leafNodesCount: 2, leafIds: ['r1', 'r2'], skills: ['Skill a'], skillCodes: ['skill-a'], isAssessmentCourse: false },
           ],
         },
       ],
-      allSkills: ['Skill A'],
+      allSkills: ['Skill a'],
+      allSkillCodes: ['skill-a', 'skill-b'],
       courseTotal: 1,
     },
+    enrollment: { isEnrolled: true },
     levelStatuses: ['active'],
     levelProgress: [{ pct: 40, completed: 0, total: 1, doneCourses: 0 }],
     summaryByCollectionId: new Map(),
@@ -68,6 +91,7 @@ function baseLp(overrides: Record<string, unknown> = {}) {
 describe('LearningPathLevelPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUsePathSkills.mockReturnValue(pathSkills());
   });
 
   it('shows the loading state', () => {
@@ -88,7 +112,23 @@ describe('LearningPathLevelPage', () => {
     expect(screen.getByText(/Foundations/)).toBeInTheDocument();
     expect(screen.getByText('Course 1')).toBeInTheDocument();
     expect(screen.getByText('Learn the basics')).toBeInTheDocument();
-    expect(screen.getByText('Skill A')).toBeInTheDocument();
+    expect(screen.getByText('name:skill-a')).toBeInTheDocument();
+  });
+
+  // Same rule as My Skills: held in the profile = Gained, still on an unfinished course = Pending.
+  it('labels each level skill Gained or Pending for an enrolled learner', () => {
+    mockUseLearningPath.mockReturnValue(baseLp({ enrollment: { isEnrolled: true } }));
+    mockUsePathSkills.mockReturnValue(pathSkills(['skill-a'], ['skill-b']));
+    render(<LearningPathLevelPage />);
+    expect(screen.getByTestId('level-skill-skill-a')).toHaveTextContent('learningPath.skillHeld');
+    expect(screen.getByTestId('level-skill-skill-b')).toHaveTextContent('learningPath.skillPending');
+  });
+
+  it('shows "In scope" when the learner is not enrolled', () => {
+    mockUseLearningPath.mockReturnValue(baseLp({ enrollment: { isEnrolled: false } }));
+    mockUsePathSkills.mockReturnValue(pathSkills(['skill-a']));
+    render(<LearningPathLevelPage />);
+    expect(screen.getByTestId('level-skill-skill-a')).toHaveTextContent('learningPath.inScope');
   });
 
   it('navigates to the player when an unlocked course row is clicked', () => {

@@ -4,11 +4,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { collectionHierarchyQueryOptions } from './useCollection';
 import { useUserEnrollmentList } from './useUserEnrollment';
 import { useViewerSummary } from './useViewerSummary';
+import { useSkillLabels, useSkillProfile } from './useSkillProfile';
 import { buildCourseSummaryMapForContext, getPathSummary, parseCourseContextId } from '../services/viewer/summaryMapper';
 import { parseLearningPath } from '../services/learningPath/learningPathMapper';
-import { aggregateSkills, buildPathSkillSummary } from '../services/learningPath/skillAggregation';
+import { buildPathSkillSummary } from '../services/learningPath/skillAggregation';
+import { aggregateMySkills, buildMySkills, heldCodeSet } from '../services/skill/mySkills';
 import { isLearningPathCategory } from '../utils/isLearningPath';
 import type { PathSkillSummary, SkillAggregate } from '../services/learningPath/skillAggregation';
+import type { MySkillEntry } from '../services/skill/mySkills';
+import type { SkillLabel } from '../services/skill';
 import type { CollectionData, TrackableCollection } from '../types/collectionTypes';
 
 /** Most-recent-activity ordering; `enrolledDate` arrives as either an epoch or an ISO string. */
@@ -36,20 +40,30 @@ export interface MySkillsEntry {
 export interface UseMySkillsResult {
   entries: MySkillsEntry[];
   summaries: PathSkillSummary[];
+  /** Every gained and pending skill, by the rule in `services/skill/mySkills.ts`. */
+  skills: MySkillEntry[];
+  /** Codes held from any source - the "already gained" baseline for suggestions and paths. */
+  heldCodes: ReadonlySet<string>;
   aggregate: SkillAggregate;
+  /** Display name + group for a code. */
+  labelOf: (code: string, frameworkId?: string) => SkillLabel;
+  /** True while framework names load - render skeletons rather than de-slugged codes. */
+  labelsLoading: boolean;
   /** Paths whose hierarchy has resolved — drives the "Analyzed X of Y" indicator. */
   analyzedCount: number;
   totalCount: number;
   isLoading: boolean;
   isError: boolean;
+  /** The skill profile failed: gained skills are unknown, so pending may include held skills. */
+  profileError: boolean;
   refetch: () => void;
 }
 
 /**
- * Every skill the learner has gained or has still to unlock, across all enrolled
- * Learning Paths.
+ * Every skill the learner has gained (from the skill profile, any source) or still has pending
+ * (on unfinished courses in enrolled Learning Paths) - ported from the portal's `useMySkills`.
  *
- * Skills live only in each path's hierarchy, so this fans out one hierarchy
+ * Pending skills live only in each path's hierarchy, so this fans out one hierarchy
  * query per enrolled path. They share `useCollection`'s cache keys, so a path
  * already opened elsewhere costs nothing, and results stream in individually —
  * the page renders each card as its query lands rather than blocking on all N.
@@ -63,6 +77,7 @@ export function useMySkills(options?: { enabled?: boolean }): UseMySkillsResult 
   const { userId, isAuthenticated } = useAuth();
   const enrolments = useUserEnrollmentList(userId, { enabled: enabled && isAuthenticated && !!userId });
   const { data: summaryRecords = [], isLoading: summaryLoading } = useViewerSummary();
+  const profile = useSkillProfile({ enabled });
 
   const paths = useMemo<EnrolledPath[]>(() => {
     const courses = enrolments.data?.data?.courses ?? [];
@@ -110,16 +125,37 @@ export function useMySkills(options?: { enabled?: boolean }): UseMySkillsResult 
     () => entries.map((e) => e.summary).filter((s): s is PathSkillSummary => !!s),
     [entries]
   );
-  const aggregate = useMemo(() => aggregateSkills(summaries), [summaries]);
+  const skills = useMemo(() => buildMySkills(profile.skills, summaries), [profile.skills, summaries]);
+  const heldCodes = useMemo(() => heldCodeSet(profile.skills), [profile.skills]);
+  const aggregate = useMemo(() => aggregateMySkills(skills, summaries), [skills, summaries]);
+
+  const frameworkIds = useMemo(
+    () => [
+      ...profile.frameworkIds,
+      ...summaries.map((s) => s.frameworkId).filter((id): id is string => Boolean(id)),
+    ],
+    [profile.frameworkIds, summaries]
+  );
+  const { labelOf, isLoading: labelsLoading } = useSkillLabels(enabled ? frameworkIds : []);
 
   return {
     entries,
     summaries,
+    skills,
+    heldCodes,
     aggregate,
+    labelOf,
+    labelsLoading,
     analyzedCount: summaries.length,
     totalCount: paths.length,
-    isLoading: enrolments.isLoading || summaryLoading,
+    // Pending is "tagged minus held", so it cannot be shown before the profile lands without
+    // flashing skills the learner already holds as pending.
+    isLoading: enrolments.isLoading || summaryLoading || profile.isLoading,
     isError: enrolments.isError,
-    refetch: () => void enrolments.refetch(),
+    profileError: profile.isError,
+    refetch: () => {
+      void enrolments.refetch();
+      void profile.refetch();
+    },
   };
 }

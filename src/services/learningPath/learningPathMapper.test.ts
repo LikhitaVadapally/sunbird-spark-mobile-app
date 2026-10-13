@@ -15,6 +15,7 @@ describe('parseLearningPath', () => {
       policy: 'Fixed',
       levels: [],
       allSkills: [],
+      allSkillCodes: [],
       courseTotal: 0,
       leafTotal: 0,
     });
@@ -67,24 +68,27 @@ describe('parseLearningPath', () => {
       expect(midLevel.courses).toHaveLength(2);
     });
 
-    it('unions skills in competencies -> skill -> se_skills order, de-duplicated', () => {
+    // `competencies` (display labels) is no longer read; `skill` carries leaf CODES, de-slugged
+    // for display while the raw codes survive in `skillCodes` for matching held skills.
+    it("reads the Level's own `skill` codes, de-slugged for display", () => {
       const midLevel = model.levels[0];
-      // level_1 declares its own `competencies`, so it takes precedence over the union of its courses' skills
       expect(midLevel.skills).toEqual(['Data literacy', 'Spreadsheet basics']);
+      expect(midLevel.skillCodes).toEqual(['data-literacy', 'spreadsheet-basics']);
+      expect(midLevel.ownSkillCodes).toEqual(['data-literacy', 'spreadsheet-basics']);
     });
 
     it('falls back to the union of course skills when a level has no own skills', () => {
-      // reconstruct a path whose only content level has no competencies of its own
+      // reconstruct a path whose only content level has no skill tags of its own
       const noOwnSkillsRoot: HierarchyContentNode = {
         ...LP_HIERARCHY_WITH_ASSESSMENTS,
         children: LP_HIERARCHY_WITH_ASSESSMENTS.children!.map((lvl) =>
-          lvl.identifier === 'level_1' ? { ...lvl, competencies: undefined, skill: undefined, se_skills: undefined } : lvl
+          lvl.identifier === 'level_1' ? { ...lvl, skill: undefined, se_skills: undefined } : lvl
         ),
       };
       const m = parseLearningPath(noOwnSkillsRoot);
-      expect(m.levels[0].skills.sort()).toEqual(
-        ['Data literacy', 'Spreadsheet basics'].sort()
-      );
+      expect(m.levels[0].ownSkillCodes).toEqual([]);
+      expect(m.levels[0].skills.length).toBeGreaterThan(0);
+      expect(m.levels[0].skillCodes.length).toBe(m.levels[0].skills.length);
     });
 
     it('computes courseTotal including prior + outcome', () => {
@@ -195,5 +199,58 @@ describe('isAssessmentCourse', () => {
       children: [{ identifier: 'e1', mimeType: 'application/vnd.ekstep.ecml-archive' }],
     };
     expect(isAssessmentCourse(ecml, ['e1'])).toBe(false);
+  });
+});
+
+// Ported from the portal: the skill-code rule the My Skills "pending" set depends on.
+describe('parseLearningPath skill codes', () => {
+  const level = (extra: Partial<HierarchyContentNode>, children: HierarchyContentNode[] = []) =>
+    ({ identifier: 'lvl_x', name: 'L', primaryCategory: 'Level', index: 1, children, ...extra }) as HierarchyContentNode;
+  const course = (id: string, extra: Partial<HierarchyContentNode> = {}): HierarchyContentNode => ({
+    identifier: id,
+    name: id,
+    mimeType: 'application/vnd.ekstep.content-collection',
+    children: [{ identifier: `${id}_r`, mimeType: 'video/mp4' }],
+    ...extra,
+  });
+  const parse = (children: HierarchyContentNode[], extra: Partial<HierarchyContentNode> = {}) =>
+    parseLearningPath({ ...LP_HIERARCHY_NO_ASSESSMENTS, ...extra, children });
+
+  it('never surfaces a raw competency code to the learner, but keeps the code', () => {
+    const m = parse([level({ skill: ['iv-administration', 'hmis_reporting'] })]);
+    expect(m.levels[0].skills).toEqual(['Iv administration', 'Hmis reporting']);
+    expect(m.levels[0].skillCodes).toEqual(['iv-administration', 'hmis_reporting']);
+  });
+
+  // REGRESSION: se_skills is the search-enriched copy of skill - a union listed every skill twice.
+  it('ignores se_skills when skill is present (not a union)', () => {
+    const m = parse([level({ skill: ['hand-hygiene'], se_skills: ['hand-hygiene', 'something-else'] })]);
+    expect(m.levels[0].skills).toEqual(['Hand hygiene']);
+    expect(m.levels[0].skillCodes).toEqual(['hand-hygiene']);
+  });
+
+  it('falls back to se_skills when a course has no skill field', () => {
+    const m = parse([level({}, [course('c_g', { se_skills: ['hand-hygiene'] })])]);
+    expect(m.levels[0].courses[0].skillCodes).toEqual(['hand-hygiene']);
+  });
+
+  it("keeps a Level's own codes apart from the union of its courses' codes", () => {
+    const m = parse([
+      level({ identifier: 'tagged', skill: ['wound-care'] }, [course('c1', { skill: ['sterile-field'] }), course('c2')]),
+      level({ identifier: 'untagged', index: 2 }, [course('c3', { skill: ['ppe-use'] }), course('c4')]),
+    ]);
+    expect(m.levels[0].ownSkillCodes).toEqual(['wound-care']);
+    expect(m.levels[1].ownSkillCodes).toEqual([]);
+    expect(m.levels[1].skillCodes).toEqual(['ppe-use']);
+  });
+
+  it('prefers the root `skill` tag for allSkillCodes, else unions the children', () => {
+    expect(parse([level({ skill: ['a'] })], { skill: ['root-a', 'root-b'] }).allSkillCodes).toEqual(['root-a', 'root-b']);
+    expect(parse([level({ skill: ['a'] })], { skill: undefined }).allSkillCodes).toEqual(['a']);
+  });
+
+  it('falls back to the taxonomy framework when the path names no competency framework', () => {
+    expect(parse([], { framework: 'nursing_fw' }).competencyFramework).toBe('nursing_fw');
+    expect(parse([], { framework: 'nursing_fw', competencyFramework: 'comp_fw' }).competencyFramework).toBe('comp_fw');
   });
 });

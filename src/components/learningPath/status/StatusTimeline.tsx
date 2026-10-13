@@ -1,29 +1,32 @@
 import React from 'react';
 import type { LearningPathModel, LevelStatusKey } from '../../../types/learningPathTypes';
-import type { SkillSourceRef } from '../../../services/learningPath/skillAggregation';
 import LPStatusBadge from '../LPStatusBadge';
 import type { LPTFunction } from '../lpTFunction';
 
 interface StatusTimelineProps {
   model: LearningPathModel;
   levelStatuses: LevelStatusKey[];
-  skillSources: SkillSourceRef[];
+  /** Codes held from any source (skill profile) - the same "gained" set My Skills uses. */
+  gainedSkills: ReadonlySet<string>;
+  nameOf: (code: string) => string;
+  /** A skill CODE selected in `SkillCelebrationPanel`, or null. */
   selectedSkill: string | null;
   t: LPTFunction;
 }
 
 /**
- * Vertical spine of every content Level (skills timeline), each dimmed when a
- * skill is selected in `SkillCelebrationPanel` and this Level doesn't teach it.
+ * Vertical spine of every content Level (skills timeline). Each Level lists its skill codes as
+ * gained/pending chips, and is dimmed when a skill is selected that it doesn't teach.
  */
-export const StatusTimeline: React.FC<StatusTimelineProps> = ({ model, levelStatuses, skillSources, selectedSkill, t }) => {
+export const StatusTimeline: React.FC<StatusTimelineProps> = ({ model, levelStatuses, gainedSkills, nameOf, selectedSkill, t }) => {
   return (
     <div className="lp-status-timeline">
       <h2 className="lp-section-title">{t('learningPath.ledgerTitle')}</h2>
       {model.levels.map((level, i) => {
         const status = levelStatuses[i];
-        const teachesSelected = !selectedSkill || level.skills.includes(selectedSkill);
-        const source = skillSources.find((s) => s.levelId === level.identifier && s.skill === selectedSkill);
+        const codes = level.skillCodes;
+        const teachesSelected = !selectedSkill || codes.includes(selectedSkill);
+        const gainedHere = codes.filter((code) => gainedSkills.has(code)).length;
         return (
           <div
             key={level.identifier}
@@ -37,19 +40,21 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({ model, levelStat
                 </span>
                 <LPStatusBadge status={status} t={t} />
               </div>
+              {codes.length > 0 && (
+                <span className="lp-status-timeline-count">
+                  {t('learningPath.skillsGainedCount', { gained: gainedHere, total: codes.length })}
+                </span>
+              )}
               <div className="lp-ledger-level-skills">
-                {level.skills.map((skill) => (
+                {codes.map((code) => (
                   <span
-                    key={skill}
-                    className={`lp-skill-chip${skill === selectedSkill ? ' lp-skill-chip--selected' : ''}`}
+                    key={code}
+                    className={`lp-skill-chip${gainedSkills.has(code) ? ' lp-skill-chip--gained' : ''}${code === selectedSkill ? ' lp-skill-chip--selected' : ''}`}
                   >
-                    {skill}
+                    {nameOf(code)}
                   </span>
                 ))}
               </div>
-              {selectedSkill && source?.gained && (
-                <span className="lp-status-timeline-gained-note">{t('learningPath.skillGainedHere')}</span>
-              )}
             </div>
           </div>
         );

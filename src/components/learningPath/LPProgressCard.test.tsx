@@ -10,10 +10,11 @@ const model: LearningPathModel = {
   name: 'Path A',
   policy: 'Diagnostic',
   levels: [
-    { identifier: 'l1', name: 'L1', index: 0, skills: [], courses: [] },
-    { identifier: 'l2', name: 'L2', index: 1, skills: [], courses: [] },
+    { identifier: 'l1', name: 'L1', index: 0, skills: [], skillCodes: [], courses: [] },
+    { identifier: 'l2', name: 'L2', index: 1, skills: [], skillCodes: [], courses: [] },
   ],
   allSkills: ['Skill A', 'Skill B'],
+  allSkillCodes: ['skill-a', 'skill-b'],
   courseTotal: 3,
   leafTotal: 6,
 };
@@ -30,6 +31,12 @@ describe('LPProgressCard', () => {
     expect(screen.getByText('learningPath.policy.diagnostic')).toBeInTheDocument();
     expect(screen.getAllByText('2')).toHaveLength(2); // levels count and skills count both happen to be 2
     expect(screen.getByText('3')).toBeInTheDocument(); // courses
+  });
+
+  // With the learner's skill counts, the stat reads gained/total - the same numbers as My Skills.
+  it('shows held/total skills when skill counts are given', () => {
+    render(<LPProgressCard model={model} progressPct={0} doneLevels={0} skillCounts={{ held: 1, total: 2 }} t={t} />);
+    expect(screen.getByTestId('lp-progress-skills')).toHaveTextContent('1/2');
   });
 
   it('renders the batch end date only when given', () => {

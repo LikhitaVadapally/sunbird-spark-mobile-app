@@ -72,9 +72,29 @@ const { mockUseAuth, mockUseLearningPath } = vi.hoisted(() => ({
 vi.mock('../contexts/AuthContext', () => ({ useAuth: mockUseAuth }));
 vi.mock('../hooks/useLearningPath', () => ({ useLearningPath: mockUseLearningPath }));
 
+const { mockUsePathSkills } = vi.hoisted(() => ({ mockUsePathSkills: vi.fn() }));
+vi.mock('../hooks/usePathSkills', () => ({ usePathSkills: mockUsePathSkills }));
+
+/** `usePathSkills` result: `held` codes are gained, `pending` still to do - the My Skills rule. */
+function pathSkills(held: string[] = [], pending: string[] = [], overrides: Record<string, unknown> = {}) {
+  const skills = [
+    ...held.map((code) => ({ code, state: 'held' as const })),
+    ...pending.map((code) => ({ code, state: 'pending' as const })),
+  ];
+  return {
+    summary: skills.length ? { skills, held: held.length, total: skills.length } : undefined,
+    heldCodes: new Set(held),
+    stateOf: (code: string) => skills.find((s) => s.code === code),
+    name: (code: string) => `name:${code}`,
+    isLoading: false,
+    isError: false,
+    ...overrides,
+  };
+}
+
 function baseLp(overrides: Record<string, unknown> = {}) {
   return {
-    model: { name: 'Path A', description: 'desc', levels: [], allSkills: [], courseTotal: 0 },
+    model: { name: 'Path A', description: 'desc', levels: [], allSkills: [], allSkillCodes: [], courseTotal: 0 },
     policy: 'Fixed',
     progress: { pct: 0, completed: 0, total: 0, doneLevels: 0, levelCount: 0 },
     levelProgress: [],
@@ -107,6 +127,7 @@ function baseLp(overrides: Record<string, unknown> = {}) {
 describe('LearningPathPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUsePathSkills.mockReturnValue(pathSkills());
     mockUseAuth.mockReturnValue({ isAuthenticated: true, userId: 'u1' });
   });
 
@@ -124,7 +145,7 @@ describe('LearningPathPage', () => {
 
   it('shows the not-found state when there is no model data at all', () => {
     mockUseLearningPath.mockReturnValue(
-      baseLp({ model: { name: '', description: '', levels: [], allSkills: [], courseTotal: 0 } })
+      baseLp({ model: { name: '', description: '', levels: [], allSkills: [], allSkillCodes: [], courseTotal: 0 } })
     );
     render(<LearningPathPage />);
     expect(screen.getByText('learningPath.notFound')).toBeInTheDocument();
@@ -133,7 +154,7 @@ describe('LearningPathPage', () => {
   it('renders the enrolled view with progress card, ledger and certificate card', () => {
     mockUseLearningPath.mockReturnValue(
       baseLp({
-        model: { name: 'Path A', description: '', levels: [{ identifier: 'l1', name: 'L1', index: 0, skills: [], courses: [] }], allSkills: [], courseTotal: 1 },
+        model: { name: 'Path A', description: '', levels: [{ identifier: 'l1', name: 'L1', index: 0, skills: [], skillCodes: [], courses: [] }], allSkills: [], allSkillCodes: [], courseTotal: 1 },
         enrollment: { ...baseLp().enrollment, isEnrolled: true },
       })
     );
@@ -145,7 +166,7 @@ describe('LearningPathPage', () => {
 
   it('shows the join-the-path CTA when authenticated but not enrolled', () => {
     mockUseLearningPath.mockReturnValue(
-      baseLp({ model: { name: 'Path A', description: '', levels: [{ identifier: 'l1', name: 'L1', index: 0, skills: [], courses: [] }], allSkills: [], courseTotal: 1 } })
+      baseLp({ model: { name: 'Path A', description: '', levels: [{ identifier: 'l1', name: 'L1', index: 0, skills: [], skillCodes: [], courses: [] }], allSkills: [], allSkillCodes: [], courseTotal: 1 } })
     );
     render(<LearningPathPage />);
     expect(screen.getByText('learningPath.joinThePath')).toBeInTheDocument();
@@ -154,7 +175,7 @@ describe('LearningPathPage', () => {
   it('shows the sign-in CTA when not authenticated', () => {
     mockUseAuth.mockReturnValue({ isAuthenticated: false, userId: null });
     mockUseLearningPath.mockReturnValue(
-      baseLp({ model: { name: 'Path A', description: '', levels: [{ identifier: 'l1', name: 'L1', index: 0, skills: [], courses: [] }], allSkills: [], courseTotal: 1 } })
+      baseLp({ model: { name: 'Path A', description: '', levels: [{ identifier: 'l1', name: 'L1', index: 0, skills: [], skillCodes: [], courses: [] }], allSkills: [], allSkillCodes: [], courseTotal: 1 } })
     );
     render(<LearningPathPage />);
     expect(screen.getByText('collection.loginToBeginJourney')).toBeInTheDocument();
@@ -164,7 +185,7 @@ describe('LearningPathPage', () => {
   it('shows the creator note instead of the enrol CTA for the path\'s own creator', () => {
     mockUseLearningPath.mockReturnValue(
       baseLp({
-        model: { name: 'Path A', description: '', levels: [{ identifier: 'l1', name: 'L1', index: 0, skills: [], courses: [] }], allSkills: [], courseTotal: 1 },
+        model: { name: 'Path A', description: '', levels: [{ identifier: 'l1', name: 'L1', index: 0, skills: [], skillCodes: [], courses: [] }], allSkills: [], allSkillCodes: [], courseTotal: 1 },
         isCreatorViewingOwnPath: true,
       })
     );
@@ -176,7 +197,7 @@ describe('LearningPathPage', () => {
   it('opens the batch picker modal when the join CTA is clicked', () => {
     mockUseLearningPath.mockReturnValue(
       baseLp({
-        model: { name: 'Path A', description: '', levels: [{ identifier: 'l1', name: 'L1', index: 0, skills: [], courses: [] }], allSkills: [], courseTotal: 1 },
+        model: { name: 'Path A', description: '', levels: [{ identifier: 'l1', name: 'L1', index: 0, skills: [], skillCodes: [], courses: [] }], allSkills: [], allSkillCodes: [], courseTotal: 1 },
         enrollment: {
           ...baseLp().enrollment,
           enrollableBatches: [{ identifier: 'b1', name: 'Batch 1' }],
@@ -195,7 +216,7 @@ describe('LearningPathPage', () => {
     const mutateAsync = vi.fn().mockResolvedValue({});
     mockUseLearningPath.mockReturnValue(
       baseLp({
-        model: { name: 'Path A', description: '', levels: [{ identifier: 'l1', name: 'L1', index: 0, skills: [], courses: [] }], allSkills: [], courseTotal: 1 },
+        model: { name: 'Path A', description: '', levels: [{ identifier: 'l1', name: 'L1', index: 0, skills: [], skillCodes: [], courses: [] }], allSkills: [], allSkillCodes: [], courseTotal: 1 },
         enrollment: {
           ...baseLp().enrollment,
           enrollableBatches: [
@@ -234,8 +255,8 @@ describe('LearningPathPage', () => {
         description: '',
         priorAssessment: undefined,
         outcomeAssessment: undefined,
-        levels: [{ identifier: 'l1', name: 'L1', index: 0, skills: [], courses: [] }],
-        allSkills: [],
+        levels: [{ identifier: 'l1', name: 'L1', index: 0, skills: [], skillCodes: [], courses: [] }],
+        allSkills: [], allSkillCodes: [],
         courseTotal: 1,
       },
       enrollment: { ...baseLp().enrollment, isEnrolled: true },
@@ -255,7 +276,7 @@ describe('LearningPathPage', () => {
         ...lp,
         model: {
           ...lp.model,
-          outcomeAssessment: { identifier: 'outcome1', name: 'Outcome', leafNodesCount: 1, leafIds: ['q2'], skills: [], isAssessmentCourse: true },
+          outcomeAssessment: { identifier: 'outcome1', name: 'Outcome', leafNodesCount: 1, leafIds: ['q2'], skills: [], skillCodes: [], isAssessmentCourse: true },
         },
       });
       render(<LearningPathPage />);
@@ -315,7 +336,7 @@ describe('LearningPathPage', () => {
         ...enrolledLp(),
         model: {
           ...enrolledLp().model,
-          priorAssessment: { identifier: 'prior1', name: 'Prior', leafNodesCount: 1, leafIds: ['q1'], skills: [], isAssessmentCourse: true },
+          priorAssessment: { identifier: 'prior1', name: 'Prior', leafNodesCount: 1, leafIds: ['q1'], skills: [], skillCodes: [], isAssessmentCourse: true },
         },
         priorState: { progress: null, done: false },
         resumeTarget: null,
@@ -341,7 +362,7 @@ describe('LearningPathPage', () => {
         ...enrolledLp(),
         model: {
           ...enrolledLp().model,
-          outcomeAssessment: { identifier: 'outcome1', name: 'Outcome', leafNodesCount: 1, leafIds: ['q2'], skills: [], isAssessmentCourse: true },
+          outcomeAssessment: { identifier: 'outcome1', name: 'Outcome', leafNodesCount: 1, leafIds: ['q2'], skills: [], skillCodes: [], isAssessmentCourse: true },
         },
         levelStatuses: ['completed'],
         outcomeState: { progress: null, unlocked: true, done: false },

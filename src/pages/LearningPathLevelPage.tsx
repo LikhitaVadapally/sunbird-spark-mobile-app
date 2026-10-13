@@ -3,11 +3,13 @@ import { IonContent, IonHeader, IonPage, IonToolbar, useIonRouter } from '@ionic
 import { useParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLearningPath } from '../hooks/useLearningPath';
+import { usePathSkills } from '../hooks/usePathSkills';
 import { computeCourseProgress } from '../services/learningPath/learningPathProgress';
 import { BackIcon } from '../components/icons/CollectionIcons';
 import PageLoader from '../components/common/PageLoader';
 import LPStatusBadge from '../components/learningPath/LPStatusBadge';
 import LPCourseRow from '../components/learningPath/LPCourseRow';
+import LPLevelSkillsCard from '../components/learningPath/LPLevelSkillsCard';
 import './LearningPathLevelPage.css';
 
 const LearningPathLevelPage: React.FC = () => {
@@ -25,6 +27,7 @@ const LearningPathLevelPage: React.FC = () => {
   }, [t]);
 
   const lp = useLearningPath(pathId, contextIdParam);
+  const pathSkills = usePathSkills(lp.model, lp.summaryByCollectionId, lp.pathSummary);
 
   const levelIndex = lp.model.levels.findIndex((l) => l.identifier === levelId);
   const level = levelIndex >= 0 ? lp.model.levels[levelIndex] : undefined;
@@ -100,7 +103,7 @@ const LearningPathLevelPage: React.FC = () => {
                 </div>
                 <div className="lp-progress-stat">
                   <span className="lp-progress-stat-label">{t('learningPath.skills')}</span>
-                  <span className="lp-progress-stat-value">{level.skills.length}</span>
+                  <span className="lp-progress-stat-value">{level.skillCodes.length}</span>
                 </div>
               </div>
 
@@ -120,16 +123,12 @@ const LearningPathLevelPage: React.FC = () => {
                 ))}
               </div>
 
-              {level.skills.length > 0 && (
-                <div className="lp-level-skills-card">
-                  <h2 className="lp-section-title">{t('learningPath.skillsTaught')}</h2>
-                  <div className="lp-ledger-level-skills">
-                    {level.skills.map((skill) => (
-                      <span key={skill} className="lp-skill-chip">{skill}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <LPLevelSkillsCard
+                codes={level.skillCodes}
+                stateOf={lp.enrollment.isEnrolled && !pathSkills.isLoading ? pathSkills.stateOf : undefined}
+                name={pathSkills.name}
+                t={t}
+              />
             </>
           )}
         </main>

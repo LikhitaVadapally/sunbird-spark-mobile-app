@@ -7,6 +7,8 @@ import type {
   LPUnitNode,
 } from '../../types/learningPathTypes';
 import { getLeafContentIds as getLeafContentIdsFromHierarchy } from '../course/enrollmentMapper';
+import { skillName } from '../skill/skillTree';
+import { skillSource } from '../skill/skillSource';
 
 const QUESTIONSET_MIME_TYPES = new Set(['application/vnd.sunbird.questionset', 'application/vnd.sunbird.question']);
 
@@ -84,9 +86,26 @@ function unionSkills(...lists: Array<string[] | undefined>): string[] {
   return Array.from(set);
 }
 
+/**
+ * Competency codes for display.
+ *
+ * The `skill` field carries leaf CODES ("dosage-calculation"); these lists are rendered straight
+ * to the learner as chips, so a raw code would surface as a slug. `skillName` with no vocabulary
+ * de-slugs it to "Dosage calculation" and leaves an already-readable taxonomy label untouched.
+ * Pages that can load the framework resolve real names from `skillCodes` instead.
+ */
+function displayable(codes: string[] | undefined): string[] {
+  return (codes ?? []).map((c) => skillName(undefined, c));
+}
+
+/*
+ * Skill codes follow `skillSource`: `skill` wins and `se_skills` is only a fallback - NOT a union
+ * (`se_skills` is the search-enriched copy of `skill`, so a union listed every skill twice), and
+ * the retired `competencies` field (display labels, not codes) is no longer read.
+ */
 function mapCourseNode(courseNode: HierarchyContentNode): LPCourseNode {
   const leafIds = getLeafContentIdsFromHierarchy(courseNode);
-  const skills = unionSkills(courseNode.competencies, courseNode.skill, courseNode.se_skills);
+  const skillCodes = skillSource(courseNode);
   const isAssessment = isAssessmentCourse(courseNode, leafIds);
   return {
     identifier: courseNode.identifier,
@@ -96,7 +115,8 @@ function mapCourseNode(courseNode: HierarchyContentNode): LPCourseNode {
     leafNodesCount: courseNode.leafNodesCount ?? leafIds.length,
     leafIds,
     units: (courseNode.children ?? []).map(mapUnitNode),
-    skills,
+    skills: displayable(skillCodes),
+    skillCodes,
     isAssessmentCourse: isAssessment,
     ...(isAssessment ? { questionCount: leafIds.length } : {}),
   };
@@ -104,7 +124,8 @@ function mapCourseNode(courseNode: HierarchyContentNode): LPCourseNode {
 
 function mapLevelNode(levelNode: HierarchyContentNode): LPLevelNode {
   const courses = (levelNode.children ?? []).map(mapCourseNode);
-  const ownSkills = unionSkills(levelNode.competencies, levelNode.skill, levelNode.se_skills);
+  const ownCodes = skillSource(levelNode);
+  const ownSkills = displayable(ownCodes);
   const skills = ownSkills.length > 0 ? ownSkills : unionSkills(...courses.map((c) => c.skills));
   return {
     identifier: levelNode.identifier,
@@ -112,6 +133,8 @@ function mapLevelNode(levelNode: HierarchyContentNode): LPLevelNode {
     index: levelNode.index ?? 0,
     description: levelNode.description,
     skills,
+    skillCodes: ownCodes.length > 0 ? ownCodes : unionSkills(...courses.map((c) => c.skillCodes)),
+    ownSkillCodes: ownCodes,
     courses,
   };
 }
@@ -137,6 +160,7 @@ export function parseLearningPath(root: HierarchyContentNode | null | undefined)
       policy: 'Fixed',
       levels: [],
       allSkills: [],
+      allSkillCodes: [],
       courseTotal: 0,
       leafTotal: 0,
     };
@@ -169,6 +193,17 @@ export function parseLearningPath(root: HierarchyContentNode | null | undefined)
     ...levels.map((l) => l.skills),
     outcomeAssessment?.skills
   );
+  // Prefer the root's own tag: it is the authoritative union, written at publish. Fall back to the
+  // children's codes for a path published before the root carried one.
+  const rootCodes = unionSkills(root.skill);
+  const allSkillCodes =
+    rootCodes.length > 0
+      ? rootCodes
+      : unionSkills(
+          priorAssessment?.skillCodes,
+          ...levels.map((l) => l.skillCodes),
+          outcomeAssessment?.skillCodes
+        );
 
   return {
     identifier: root.identifier,
@@ -179,6 +214,10 @@ export function parseLearningPath(root: HierarchyContentNode | null | undefined)
     priorAssessment,
     outcomeAssessment,
     allSkills,
+    allSkillCodes,
+    // `framework` is the taxonomy framework the content's `skill` terms come from; it stands in
+    // for paths authored before `competencyFramework` existed, so their names still resolve.
+    competencyFramework: root.competencyFramework ?? root.framework,
     courseTotal,
     leafTotal: root.leafNodesCount ?? getLeafContentIdsFromHierarchy(root).length,
   };

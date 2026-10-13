@@ -3,6 +3,7 @@ import { IonContent, IonHeader, IonPage, IonToolbar, useIonRouter } from '@ionic
 import { useParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLearningPath } from '../hooks/useLearningPath';
+import { usePathSkills } from '../hooks/usePathSkills';
 import { useAssessmentReadMap, useStoredAssessmentScores } from '../hooks/useAssessmentScores';
 import { mergeAssessmentSources, resolveAssessmentInfo } from '../services/learningPath/learningPathAssessment';
 import { BackIcon } from '../components/icons/CollectionIcons';
@@ -25,6 +26,8 @@ const LearningPathAssessmentPage: React.FC<LearningPathAssessmentPageProps> = ({
 
   const lp = useLearningPath(pathId, contextIdParam);
   const course = variant === 'prior' ? lp.model.priorAssessment : lp.model.outcomeAssessment;
+  // Held = in the skill profile from any source - the same "gained" set My Skills uses.
+  const pathSkills = usePathSkills(lp.model, lp.summaryByCollectionId, lp.pathSummary);
 
   const localScores = useStoredAssessmentScores(course?.identifier);
   const serverScores = useAssessmentReadMap(course?.identifier, lp.enrollment.effectiveContextId, course?.leafIds ?? []);
@@ -110,13 +113,22 @@ const LearningPathAssessmentPage: React.FC<LearningPathAssessmentPageProps> = ({
                 </div>
               </div>
 
-              {course.skills.length > 0 && (
+              {course.skillCodes.length > 0 && (
                 <div className="lp-assessment-skills-card">
                   <h2 className="lp-section-title">{t('learningPath.skillsAssessed')}</h2>
                   <div className="lp-ledger-level-skills">
-                    {course.skills.map((skill) => (
-                      <span key={skill} className="lp-skill-chip">{skill}</span>
-                    ))}
+                    {course.skillCodes.map((code) => {
+                      const held = !pathSkills.isLoading && pathSkills.heldCodes.has(code);
+                      return (
+                        <span
+                          key={code}
+                          className={`lp-skill-chip${held ? ' lp-skill-chip--gained' : ''}`}
+                          data-testid={held ? 'skill-chip-gained' : undefined}
+                        >
+                          {pathSkills.name(code)}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               )}

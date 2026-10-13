@@ -49,3 +49,54 @@
   padding: 1rem;
   border-radius: 0.75rem;
 }
+
+.lp-level-skill-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lp-level-skill-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.625rem;
+  padding: 0.625rem 0;
+  border-top: 1px solid var(--color-e6e6e6, #e6e6e6);
+}
+
+.lp-level-skill-row:first-child {
+  border-top: none;
+}
+
+.lp-level-skill-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  font-size: 0.875rem;
+  color: var(--ion-color-dark, #222222);
+}
+
+.lp-level-skill-dot {
+  flex-shrink: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--color-e0e0e0, #e0e0e0);
+}
+
+.lp-level-skill-dot--held {
+  background: var(--ion-color-success);
+}
+
+.lp-level-skill-state {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--color-757575, #757575);
+}
+
+.lp-level-skill-state--held {
+  font-weight: 600;
+  color: #3f5730;
+}

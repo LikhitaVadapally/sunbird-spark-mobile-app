@@ -67,6 +67,13 @@ const relatedItems = [
     }
 ];
 
+/**
+ * Static design mockup at `/course-details` - nothing in the app navigates here and it binds
+ * no course data. The learner-facing course page is `CollectionPage` (`/collection/:id`),
+ * which renders the course's real skills via `CollectionOverview` -> `CourseSkills`. The
+ * placeholder "Skills you will learn" list and fake "Week 2: Core Competencies" were removed
+ * so this page no longer advertises invented skills.
+ */
 const CourseDetailsPage: React.FC = () => {
     useImpression({ pageid: 'CourseDetailsPage', env: 'course' });
     const history = useHistory();
@@ -128,18 +135,6 @@ const CourseDetailsPage: React.FC = () => {
                         </p>
                     </div>
 
-                    {/* Skills */}
-                    <div className="section-container">
-                        <h2 className="section-title">Skills you will learn</h2>
-                        <ul className="skills-list">
-                            <li><CheckIcon /> Business analysis, planning, and monitoring</li>
-                            <li><CheckIcon /> Elicitation and collaboration</li>
-                            <li><CheckIcon /> Requirements life cycle management</li>
-                            <li><CheckIcon /> Business intelligence perspective</li>
-                            <li><CheckIcon /> Requirements analysis and design definition</li>
-                        </ul>
-                    </div>
-
                     {/* Best Suited For */}
                     <div className="section-container">
                         <h2 className="section-title">Best Suited For</h2>
@@ -199,15 +194,6 @@ const CourseDetailsPage: React.FC = () => {
                                         </div>
                                         <span className="curriculum-item-time">04:56</span>
                                     </div>
-                                </div>
-                            </IonAccordion>
-
-                            <IonAccordion value="week2" className="curriculum-accordion">
-                                <IonItem slot="header" className="curriculum-header" lines="none">
-                                    <IonLabel>Week 2: Core Competencies</IonLabel>
-                                </IonItem>
-                                <div slot="content">
-                                    {/* Empty for design */}
                                 </div>
                             </IonAccordion>
 

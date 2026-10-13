@@ -12,26 +12,29 @@ const suggestions: SkillSuggestion[] = [
 
 describe('SkillSuggestionRow', () => {
   it('renders nothing when there are no suggestions', () => {
-    const { container } = render(<SkillSuggestionRow suggestions={[]} onSelect={vi.fn()} t={t} />);
+    const { container } = render(<SkillSuggestionRow suggestions={[]} nameOf={(c) => `name:${c}`} onSelect={vi.fn()} t={t} />);
     expect(container.innerHTML).toBe('');
   });
 
   it('renders a card per suggestion with its name and new-skill count', () => {
-    render(<SkillSuggestionRow suggestions={suggestions} onSelect={vi.fn()} t={t} />);
+    render(<SkillSuggestionRow suggestions={suggestions} nameOf={(c) => `name:${c}`} onSelect={vi.fn()} t={t} />);
     expect(screen.getByText('Path A')).toBeInTheDocument();
-    expect(screen.getByText('mySkills.newSkillsCount:{"count":2}')).toBeInTheDocument();
+    expect(screen.getByText('mySkills.newSkillCount:{"count":2}')).toBeInTheDocument();
+    expect(screen.getByText('name:A')).toBeInTheDocument();
+    expect(screen.getByText('mySkills.sourceEnrolled')).toBeInTheDocument();
+    expect(screen.getByText('mySkills.sourceDiscover')).toBeInTheDocument();
     expect(screen.getByText('Path B')).toBeInTheDocument();
   });
 
   it('shows progress only for enrolled-source suggestions', () => {
-    render(<SkillSuggestionRow suggestions={suggestions} onSelect={vi.fn()} t={t} />);
+    render(<SkillSuggestionRow suggestions={suggestions} nameOf={(c) => `name:${c}`} onSelect={vi.fn()} t={t} />);
     expect(screen.getByText('40%')).toBeInTheDocument();
     expect(screen.queryByText('0%')).not.toBeInTheDocument();
   });
 
   it('calls onSelect with the clicked suggestion', () => {
     const onSelect = vi.fn();
-    render(<SkillSuggestionRow suggestions={suggestions} onSelect={onSelect} t={t} />);
+    render(<SkillSuggestionRow suggestions={suggestions} nameOf={(c) => `name:${c}`} onSelect={onSelect} t={t} />);
     fireEvent.click(screen.getByText('Path A'));
     expect(onSelect).toHaveBeenCalledWith(suggestions[0]);
   });

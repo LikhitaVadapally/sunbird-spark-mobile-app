@@ -41,9 +41,29 @@ vi.mock('react-i18next', () => ({
 const { mockUseLearningPath } = vi.hoisted(() => ({ mockUseLearningPath: vi.fn() }));
 vi.mock('../hooks/useLearningPath', () => ({ useLearningPath: mockUseLearningPath }));
 
+const { mockUsePathSkills } = vi.hoisted(() => ({ mockUsePathSkills: vi.fn() }));
+vi.mock('../hooks/usePathSkills', () => ({ usePathSkills: mockUsePathSkills }));
+
+/** `usePathSkills` result: `held` codes are gained, `pending` still to do - the My Skills rule. */
+function pathSkills(held: string[] = [], pending: string[] = [], overrides: Record<string, unknown> = {}) {
+  const skills = [
+    ...held.map((code) => ({ code, state: 'held' as const })),
+    ...pending.map((code) => ({ code, state: 'pending' as const })),
+  ];
+  return {
+    summary: skills.length ? { skills, held: held.length, total: skills.length } : undefined,
+    heldCodes: new Set(held),
+    stateOf: (code: string) => skills.find((s) => s.code === code),
+    name: (code: string) => `name:${code}`,
+    isLoading: false,
+    isError: false,
+    ...overrides,
+  };
+}
+
 function baseLp(overrides: Record<string, unknown> = {}) {
   return {
-    model: { name: 'Path A', levels: [{ identifier: 'l1', name: 'L1', index: 0, skills: [], courses: [] }], allSkills: ['Skill A'], courseTotal: 1 },
+    model: { name: 'Path A', levels: [{ identifier: 'l1', name: 'L1', index: 0, skills: [], skillCodes: [], courses: [] }], allSkills: ['Skill A'], courseTotal: 1 },
     levelStatuses: ['active'],
     pathSummary: undefined,
     summaryByCollectionId: new Map(),
@@ -57,6 +77,7 @@ function baseLp(overrides: Record<string, unknown> = {}) {
 describe('LearningPathStatusPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUsePathSkills.mockReturnValue(pathSkills());
   });
 
   it('shows the loading state', () => {
@@ -78,5 +99,20 @@ describe('LearningPathStatusPage', () => {
     expect(screen.getByTestId('skill-panel')).toBeInTheDocument();
     expect(screen.getByTestId('status-timeline')).toBeInTheDocument();
     expect(screen.getByText('Path A')).toBeInTheDocument();
+  });
+
+  // The hero counts what My Skills counts for this path: held / (held + pending).
+  it('feeds the hero the gained/pending counts from usePathSkills, not the whole scope', () => {
+    mockUseLearningPath.mockReturnValue(baseLp());
+    mockUsePathSkills.mockReturnValue(pathSkills(['a'], ['b', 'c']));
+    render(<LearningPathStatusPage />);
+    expect(screen.getByTestId('status-hero')).toHaveTextContent('1/3');
+  });
+
+  it('explains a skill-profile failure', () => {
+    mockUseLearningPath.mockReturnValue(baseLp());
+    mockUsePathSkills.mockReturnValue(pathSkills([], [], { isError: true }));
+    render(<LearningPathStatusPage />);
+    expect(screen.getByRole('alert')).toHaveTextContent('mySkills.profileError');
   });
 });

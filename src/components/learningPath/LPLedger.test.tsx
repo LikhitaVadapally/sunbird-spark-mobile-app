@@ -18,20 +18,22 @@ const model: LearningPathModel = {
   identifier: 'lp1',
   name: 'Path A',
   policy: 'Fixed',
-  priorAssessment: { identifier: 'prior1', name: 'Prior Check', leafNodesCount: 1, leafIds: ['q1'], skills: [], isAssessmentCourse: true },
-  outcomeAssessment: { identifier: 'outcome1', name: 'Final Check', leafNodesCount: 1, leafIds: ['q2'], skills: [], isAssessmentCourse: true },
+  priorAssessment: { identifier: 'prior1', name: 'Prior Check', leafNodesCount: 1, leafIds: ['q1'], skills: [], skillCodes: [], isAssessmentCourse: true },
+  outcomeAssessment: { identifier: 'outcome1', name: 'Final Check', leafNodesCount: 1, leafIds: ['q2'], skills: [], skillCodes: [], isAssessmentCourse: true },
   levels: [
     {
       identifier: 'l1',
       name: 'Foundations',
       index: 0,
       skills: ['Skill A'],
+      skillCodes: ['skill-a'],
       courses: [
-        { identifier: 'c1', name: 'Course 1', leafNodesCount: 2, leafIds: ['r1', 'r2'], skills: ['Skill A'], isAssessmentCourse: false },
+        { identifier: 'c1', name: 'Course 1', leafNodesCount: 2, leafIds: ['r1', 'r2'], skills: ['Skill A'], skillCodes: ['skill-a'], isAssessmentCourse: false },
       ],
     },
   ],
   allSkills: ['Skill A'],
+  allSkillCodes: ['skill-a'],
   courseTotal: 3,
   leafTotal: 4,
 };
@@ -92,9 +94,23 @@ describe('LPLedger', () => {
   it("renders each level's courses (via LPCourseRow) and skills, with real per-course progress", () => {
     render(<LPLedger {...baseProps} levelStatuses={['active']} levelProgress={[{ pct: 50, completed: 1, total: 2, doneCourses: 0 }]} />);
     expect(screen.getByText('Course 1')).toBeInTheDocument();
-    expect(screen.getByText('Skill A')).toBeInTheDocument();
+    // No name resolver given: the code is de-slugged rather than shown raw.
+    expect(screen.getByText('Skill a')).toBeInTheDocument();
     // computeCourseProgress on an untouched summary map: 0/2 · 0% (real, not the level's 50% average)
     expect(screen.getByText('0/2 · 0%')).toBeInTheDocument();
+  });
+
+  // Same gained rule as My Skills: a chip is gained only when the skill profile holds the code.
+  it('names level skills via skillName and marks the held ones gained', () => {
+    render(
+      <LPLedger
+        {...baseProps}
+        levelStatuses={['active']}
+        heldCodes={new Set(['skill-a'])}
+        skillName={(code) => (code === 'skill-a' ? 'Skill Alpha' : code)}
+      />
+    );
+    expect(screen.getByText('Skill Alpha')).toHaveClass('lp-skill-chip--gained');
   });
 
   it('fires onOpenCourse with the course id and its first leaf id when a course row is clicked', () => {

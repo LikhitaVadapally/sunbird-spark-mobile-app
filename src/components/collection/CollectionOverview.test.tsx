@@ -10,6 +10,10 @@ vi.mock('../icons/CollectionIcons', () => ({
   VideoIcon: () => <span data-testid="video-icon" />,
 }));
 
+vi.mock('./CourseSkills', () => ({
+  default: ({ codes }: { codes: string[] }) => <div data-testid="course-skills" data-codes={codes.join(',')} />,
+}));
+
 const mockT = (key: string) => {
   const map: Record<string, string> = {
     'collection.lessons': 'Lessons',
@@ -83,5 +87,16 @@ describe('CollectionOverview', () => {
     const data = { ...baseData, audience: [] };
     render(<CollectionOverview collectionData={data} isCourse={true} t={mockT} />);
     expect(screen.queryByText('Best Suited For')).not.toBeInTheDocument();
+  });
+
+  it('passes the course skill codes (skill, else se_skills) to CourseSkills', () => {
+    const data = { ...baseData, hierarchyRoot: { identifier: 'do_123', skill: ['hand-hygiene'], se_skills: ['legacy'] } };
+    render(<CollectionOverview collectionData={data as CollectionData} isCourse={true} t={mockT} />);
+    expect(screen.getByTestId('course-skills')).toHaveAttribute('data-codes', 'hand-hygiene');
+  });
+
+  it('hides the skills section when the course has no skills', () => {
+    render(<CollectionOverview collectionData={baseData} isCourse={true} t={mockT} />);
+    expect(screen.queryByTestId('course-skills')).not.toBeInTheDocument();
   });
 });

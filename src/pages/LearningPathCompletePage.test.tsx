@@ -43,6 +43,26 @@ vi.mock('react-i18next', () => ({
 const { mockUseLearningPath } = vi.hoisted(() => ({ mockUseLearningPath: vi.fn() }));
 vi.mock('../hooks/useLearningPath', () => ({ useLearningPath: mockUseLearningPath }));
 
+const { mockUsePathSkills } = vi.hoisted(() => ({ mockUsePathSkills: vi.fn() }));
+vi.mock('../hooks/usePathSkills', () => ({ usePathSkills: mockUsePathSkills }));
+
+/** `usePathSkills` result: `held` codes are gained, `pending` still to do - the My Skills rule. */
+function pathSkills(held: string[] = [], pending: string[] = [], overrides: Record<string, unknown> = {}) {
+  const skills = [
+    ...held.map((code) => ({ code, state: 'held' as const })),
+    ...pending.map((code) => ({ code, state: 'pending' as const })),
+  ];
+  return {
+    summary: skills.length ? { skills, held: held.length, total: skills.length } : undefined,
+    heldCodes: new Set(held),
+    stateOf: (code: string) => skills.find((s) => s.code === code),
+    name: (code: string) => ({ 'hand-hygiene': 'Hand Hygiene', 'skill-a': 'Skill A' })[code] ?? code,
+    isLoading: false,
+    isError: false,
+    ...overrides,
+  };
+}
+
 const priorCourse = { identifier: 'prior1', name: 'Prior', leafNodesCount: 1, leafIds: ['q1'], skills: [], isAssessmentCourse: true };
 const outcomeCourse = { identifier: 'outcome1', name: 'Outcome', leafNodesCount: 1, leafIds: ['q2'], skills: [], isAssessmentCourse: true };
 
@@ -67,6 +87,7 @@ function baseLp(overrides: Record<string, unknown> = {}) {
 describe('LearningPathCompletePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUsePathSkills.mockReturnValue(pathSkills(['skill-a']));
   });
 
   it('shows the loading state', () => {
@@ -98,5 +119,39 @@ describe('LearningPathCompletePage', () => {
     const scoreRows = screen.getByTestId('lp-score-rows');
     expect(JSON.parse(scoreRows.getAttribute('data-prior')!)).toEqual({ score: 8, maxScore: 10 });
     expect(JSON.parse(scoreRows.getAttribute('data-outcome')!)).toEqual({ score: 9, maxScore: 10 });
+  });
+
+  describe('skills gained', () => {
+    // Regression: the screen used to list model.allSkills - every tagged skill - as gained.
+    it('lists only the path skills the learner holds, by framework name', () => {
+      mockUseLearningPath.mockReturnValue(baseLp());
+      mockUsePathSkills.mockReturnValue(pathSkills(['hand-hygiene'], ['sterile-field']));
+      render(<LearningPathCompletePage />);
+      expect(screen.getByText('Hand Hygiene')).toBeInTheDocument();
+      expect(screen.queryByText('sterile-field')).not.toBeInTheDocument();
+    });
+
+    it('hides the card when the learner holds none of the path skills', () => {
+      mockUseLearningPath.mockReturnValue(baseLp());
+      mockUsePathSkills.mockReturnValue(pathSkills([], ['sterile-field']));
+      render(<LearningPathCompletePage />);
+      expect(screen.queryByText('learningPath.skillsGainedTitle')).not.toBeInTheDocument();
+    });
+
+    it('shows nothing while the profile is loading', () => {
+      mockUseLearningPath.mockReturnValue(baseLp());
+      mockUsePathSkills.mockReturnValue(pathSkills(['hand-hygiene'], [], { isLoading: true }));
+      render(<LearningPathCompletePage />);
+      expect(screen.queryByText('learningPath.skillsGainedTitle')).not.toBeInTheDocument();
+    });
+
+    // Same as My Skills: without the profile nothing is gained, and the learner is told why.
+    it('explains a profile failure instead of guessing gained skills', () => {
+      mockUseLearningPath.mockReturnValue(baseLp());
+      mockUsePathSkills.mockReturnValue(pathSkills([], ['hand-hygiene'], { isError: true }));
+      render(<LearningPathCompletePage />);
+      expect(screen.getByRole('alert')).toHaveTextContent('mySkills.profileError');
+      expect(screen.queryByText('Hand Hygiene')).not.toBeInTheDocument();
+    });
   });
 });

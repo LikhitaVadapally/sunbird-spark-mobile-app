@@ -48,7 +48,10 @@ export interface LPCourseNode {
   leafIds: string[];
   /** The course's own children (units/leaves), preserved for the expandable rail rows. */
   units?: LPUnitNode[];
+  /** De-slugged for display. */
   skills: string[];
+  /** The raw competency leaf CODES, for matching against the learner's held skills. */
+  skillCodes: string[];
   /** True when every leaf under this course is a QuML question set. */
   isAssessmentCourse: boolean;
   questionCount?: number;
@@ -60,6 +63,13 @@ export interface LPLevelNode {
   index: number;
   description?: string;
   skills: string[];
+  /** The Level's own codes, or - when it carries none - the union of its courses' codes. */
+  skillCodes: string[];
+  /**
+   * Only the codes tagged on the Level itself. An untagged course falls back to these (not to
+   * the union above, which would borrow its siblings' skills).
+   */
+  ownSkillCodes?: string[];
   courses: LPCourseNode[];
 }
 
@@ -75,6 +85,10 @@ export interface LearningPathModel {
   /** Unwrapped from the last level, when it held exactly one assessment course. */
   outcomeAssessment?: LPCourseNode;
   allSkills: string[];
+  /** Raw leaf codes across the whole path. */
+  allSkillCodes: string[];
+  /** Framework the path's codes belong to (falls back to the taxonomy `framework`) - names only. */
+  competencyFramework?: string;
   courseTotal: number;
   leafTotal: number;
 }

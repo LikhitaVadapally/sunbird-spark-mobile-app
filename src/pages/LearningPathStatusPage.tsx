@@ -3,7 +3,7 @@ import { IonContent, IonHeader, IonPage, IonToolbar, useIonRouter } from '@ionic
 import { useParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLearningPath } from '../hooks/useLearningPath';
-import { buildPathSkillSummary } from '../services/learningPath/skillAggregation';
+import { usePathSkills } from '../hooks/usePathSkills';
 import { BackIcon } from '../components/icons/CollectionIcons';
 import PageLoader from '../components/common/PageLoader';
 import StatusHero from '../components/learningPath/status/StatusHero';
@@ -24,10 +24,10 @@ const LearningPathStatusPage: React.FC = () => {
   const lp = useLearningPath(pathId, contextIdParam);
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
 
-  const skillSummary = useMemo(
-    () => buildPathSkillSummary(lp.model, lp.pathSummary, lp.summaryByCollectionId, lp.enrollment.effectiveContextId),
-    [lp.model, lp.pathSummary, lp.summaryByCollectionId, lp.enrollment.effectiveContextId]
-  );
+  // Gained = held in the skill profile (any source), pending = still on an unfinished course here:
+  // the same rule, and so the same numbers, as My Skills.
+  const pathSkills = usePathSkills(lp.model, lp.summaryByCollectionId, lp.pathSummary);
+  const pathSkillCodes = useMemo(() => (pathSkills.summary?.skills ?? []).map((s) => s.code), [pathSkills.summary]);
 
   const handleBack = () => {
     if (location.state?.parentRoute) {
@@ -63,11 +63,16 @@ const LearningPathStatusPage: React.FC = () => {
                 <h1 className="lp-title">{lp.model.name}</h1>
               </div>
 
-              <StatusHero gainedCount={skillSummary.gainedCount} totalCount={lp.model.allSkills.length} t={t} />
+              <StatusHero gainedCount={pathSkills.summary?.held ?? 0} totalCount={pathSkillCodes.length} t={t} />
+
+              {pathSkills.isError && (
+                <p className="lp-skill-profile-error" role="alert">{t('mySkills.profileError')}</p>
+              )}
 
               <SkillCelebrationPanel
-                allSkills={lp.model.allSkills}
-                gainedSkills={skillSummary.gainedSkills}
+                allSkills={pathSkillCodes}
+                gainedSkills={pathSkills.heldCodes}
+                nameOf={pathSkills.name}
                 selectedSkill={selectedSkill}
                 onSelectSkill={setSelectedSkill}
                 t={t}
@@ -76,7 +81,8 @@ const LearningPathStatusPage: React.FC = () => {
               <StatusTimeline
                 model={lp.model}
                 levelStatuses={lp.levelStatuses}
-                skillSources={skillSummary.skillSources}
+                gainedSkills={pathSkills.heldCodes}
+                nameOf={pathSkills.name}
                 selectedSkill={selectedSkill}
                 t={t}
               />

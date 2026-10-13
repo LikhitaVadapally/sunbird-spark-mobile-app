@@ -88,6 +88,16 @@
   padding: 1rem 1rem 1.5rem;
 }
 
+.cp-skills-section {
+  padding: 1rem 1rem 0.5rem;
+}
+
+.cp-skill-icon-slot {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 13px;
+}
+
 /* ── Progress section (inside overview wrapper, enrolled trackable) ── */
 .cp-progress-section {
   display: flex;

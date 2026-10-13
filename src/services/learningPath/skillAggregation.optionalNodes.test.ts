@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseLearningPath } from './learningPathMapper';
-import { buildPathSkillSummary } from './skillAggregation';
+import { getFinishedCourseIds } from './skillAggregation';
 import { LP_HIERARCHY_NO_ASSESSMENTS } from './__fixtures__/lpHierarchyNoAssessments.fixture';
 import type { ViewerSummaryRecord } from '../../types/viewerServiceTypes';
 
@@ -20,17 +20,17 @@ function pathSummaryWith(optionalNodes: string[]): ViewerSummaryRecord {
   };
 }
 
-describe('buildPathSkillSummary — optional_nodes', () => {
-  it('does not credit a Level with no progress and no waiver', () => {
-    const summary = buildPathSkillSummary(model, pathSummaryWith([]), new Map(), 'batch_1');
-    level1.skills.forEach((skill) => expect(summary.gainedSkills.has(skill)).toBe(false));
+describe('getFinishedCourseIds — optional_nodes', () => {
+  it('does not finish a course with no progress and no waiver', () => {
+    const finished = getFinishedCourseIds(model, pathSummaryWith([]), new Map());
+    level1.courses.forEach((course) => expect(finished.has(course.identifier)).toBe(false));
   });
 
-  it('credits a waived Level’s skills as gained', () => {
-    // The Level's own id in optional_nodes waives it wholesale, so its skills
-    // count even though `computeLevelProgress` never reaches 100 for it.
-    const summary = buildPathSkillSummary(model, pathSummaryWith([level1.identifier]), new Map(), 'batch_1');
-    expect(level1.skills.length).toBeGreaterThan(0);
-    level1.skills.forEach((skill) => expect(summary.gainedSkills.has(skill)).toBe(true));
+  it('finishes every course in a waived Level', () => {
+    // The Level's own id in optional_nodes waives it wholesale, so its courses stop counting as
+    // still-to-do (their skills leave "pending") even though no leaf was completed.
+    const finished = getFinishedCourseIds(model, pathSummaryWith([level1.identifier]), new Map());
+    expect(level1.courses.length).toBeGreaterThan(0);
+    level1.courses.forEach((course) => expect(finished.has(course.identifier)).toBe(true));
   });
 });

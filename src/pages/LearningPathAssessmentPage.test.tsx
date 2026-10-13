@@ -35,6 +35,26 @@ const { mockUseLearningPath, mockUseAssessmentReadMap, mockUseStoredAssessmentSc
   mockUseStoredAssessmentScores: vi.fn(() => ({})),
 }));
 vi.mock('../hooks/useLearningPath', () => ({ useLearningPath: mockUseLearningPath }));
+
+const { mockUsePathSkills } = vi.hoisted(() => ({ mockUsePathSkills: vi.fn() }));
+vi.mock('../hooks/usePathSkills', () => ({ usePathSkills: mockUsePathSkills }));
+
+/** `usePathSkills` result: `held` codes are gained, `pending` still to do - the My Skills rule. */
+function pathSkills(held: string[] = [], pending: string[] = [], overrides: Record<string, unknown> = {}) {
+  const skills = [
+    ...held.map((code) => ({ code, state: 'held' as const })),
+    ...pending.map((code) => ({ code, state: 'pending' as const })),
+  ];
+  return {
+    summary: skills.length ? { skills, held: held.length, total: skills.length } : undefined,
+    heldCodes: new Set(held),
+    stateOf: (code: string) => skills.find((s) => s.code === code),
+    name: (code: string) => `name:${code}`,
+    isLoading: false,
+    isError: false,
+    ...overrides,
+  };
+}
 vi.mock('../hooks/useAssessmentScores', () => ({
   useAssessmentReadMap: mockUseAssessmentReadMap,
   useStoredAssessmentScores: mockUseStoredAssessmentScores,
@@ -45,7 +65,8 @@ const priorCourse = {
   name: 'Data readiness check',
   leafNodesCount: 1,
   leafIds: ['q1'],
-  skills: ['SQL basics'],
+  skills: ['Sql basics'],
+  skillCodes: ['sql-basics', 'joins'],
   isAssessmentCourse: true,
   questionCount: 1,
 };
@@ -66,6 +87,7 @@ function baseLp(overrides: Record<string, unknown> = {}) {
 describe('LearningPathAssessmentPage (prior variant)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUsePathSkills.mockReturnValue(pathSkills());
     mockUseAssessmentReadMap.mockReturnValue({});
     mockUseStoredAssessmentScores.mockReturnValue({});
   });
@@ -87,7 +109,16 @@ describe('LearningPathAssessmentPage (prior variant)', () => {
     render(<LearningPathAssessmentPage variant="prior" />);
     expect(screen.getByText('Data readiness check')).toBeInTheDocument();
     expect(screen.getByText('1')).toBeInTheDocument(); // question count
-    expect(screen.getByText('SQL basics')).toBeInTheDocument();
+    expect(screen.getByText('name:sql-basics')).toBeInTheDocument();
+  });
+
+  // "Skills assessed" marks a skill held only when the profile holds it - the My Skills rule.
+  it('marks the assessed skills the learner already holds', () => {
+    mockUseLearningPath.mockReturnValue(baseLp());
+    mockUsePathSkills.mockReturnValue(pathSkills(['sql-basics']));
+    render(<LearningPathAssessmentPage variant="prior" />);
+    expect(screen.getByText('name:sql-basics')).toHaveClass('lp-skill-chip--gained');
+    expect(screen.getByText('name:joins')).not.toHaveClass('lp-skill-chip--gained');
   });
 
   it('is always unlocked for the prior variant, showing Start assessment', () => {
@@ -123,6 +154,7 @@ describe('LearningPathAssessmentPage (prior variant)', () => {
 describe('LearningPathAssessmentPage (outcome variant)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUsePathSkills.mockReturnValue(pathSkills());
     mockUseAssessmentReadMap.mockReturnValue({});
     mockUseStoredAssessmentScores.mockReturnValue({});
   });

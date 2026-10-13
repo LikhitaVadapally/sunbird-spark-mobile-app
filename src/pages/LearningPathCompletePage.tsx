@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { IonContent, IonHeader, IonModal, IonPage, IonToolbar, useIonRouter } from '@ionic/react';
 import { useParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLearningPath } from '../hooks/useLearningPath';
+import { usePathSkills } from '../hooks/usePathSkills';
 import { getAssessmentScore } from '../services/learningPath/learningPathProgress';
 import { BackIcon } from '../components/icons/CollectionIcons';
 import PageLoader from '../components/common/PageLoader';
@@ -30,6 +31,18 @@ const LearningPathCompletePage: React.FC = () => {
   const outcomeScore = lp.model.outcomeAssessment
     ? getAssessmentScore(lp.model.outcomeAssessment.identifier, lp.pathSummary, lp.model.outcomeAssessment.leafIds)
     : null;
+
+  /**
+   * Only skills actually gained - never `model.allSkills` wholesale, which claimed every tagged
+   * skill whether or not the learner had earned it. Gained = the path's codes the learner holds in
+   * the skill profile, by the same rule as My Skills (`usePathSkills`). Empty while the profile
+   * loads, so nothing flashes; on a profile failure a note says why the list is empty.
+   */
+  const pathSkills = usePathSkills(lp.model, lp.summaryByCollectionId, lp.pathSummary);
+  const gainedSkills = useMemo<string[]>(
+    () => (pathSkills.isLoading ? [] : (pathSkills.summary?.skills ?? []).filter((s) => s.state === 'held').map((s) => s.code)),
+    [pathSkills.isLoading, pathSkills.summary]
+  );
 
   const handleBack = () => {
     if (location.state?.parentRoute) {
@@ -81,12 +94,17 @@ const LearningPathCompletePage: React.FC = () => {
                 t={t}
               />
 
-              {lp.model.allSkills.length > 0 && (
+              {pathSkills.isError && (
+                <p className="lp-skill-profile-error" role="alert">{t('mySkills.profileError')}</p>
+              )}
+              {gainedSkills.length > 0 && (
                 <div className="lp-complete-skills-card">
                   <h2 className="lp-section-title">{t('learningPath.skillsGainedTitle')}</h2>
                   <div className="lp-ledger-level-skills">
-                    {lp.model.allSkills.map((skill) => (
-                      <span key={skill} className="lp-skill-chip lp-skill-chip--gained">{skill}</span>
+                    {gainedSkills.map((code) => (
+                      <span key={code} className="lp-skill-chip lp-skill-chip--gained">
+                        {pathSkills.name(code)}
+                      </span>
                     ))}
                   </div>
                 </div>

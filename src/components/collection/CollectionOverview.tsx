@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { CollectionData } from '../../types/collectionTypes';
 import { CheckIcon, CalendarIcon, VideoIcon } from '../icons/CollectionIcons';
+import { skillSource } from '../../services/skill/skillSource';
+import CourseSkills from './CourseSkills';
 
 interface CollectionOverviewProps {
   collectionData: CollectionData;
@@ -11,6 +13,8 @@ interface CollectionOverviewProps {
 }
 
 const CollectionOverview: React.FC<CollectionOverviewProps> = ({ collectionData, isCourse, t, hideBestSuited, children }) => {
+  const skillCodes = useMemo(() => skillSource(collectionData.hierarchyRoot), [collectionData.hierarchyRoot]);
+
   return (
     <div className="cp-overview-wrapper">
       {/* Title + Lessons */}
@@ -37,6 +41,9 @@ const CollectionOverview: React.FC<CollectionOverviewProps> = ({ collectionData,
           </div>
         </div>
       </div>
+
+      {/* Skills the course teaches - hidden when the course is untagged */}
+      {skillCodes.length > 0 && <CourseSkills codes={skillCodes} t={t} />}
 
       {/* Best Suited For */}
       {!hideBestSuited && collectionData.audience.length > 0 && (

@@ -12,6 +12,7 @@ import { useParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { useLearningPath } from '../hooks/useLearningPath';
+import { usePathSkills } from '../hooks/usePathSkills';
 import { BackIcon } from '../components/icons/CollectionIcons';
 import PageLoader from '../components/common/PageLoader';
 import BatchSelectSheet from '../components/common/BatchSelectSheet';
@@ -32,6 +33,8 @@ const LearningPathPage: React.FC = () => {
   }, [t]);
 
   const lp = useLearningPath(pathId, contextIdParam);
+  // Gained/pending by the My Skills rule, so the overview and the ledger agree with My Skills.
+  const pathSkills = usePathSkills(lp.model, lp.summaryByCollectionId, lp.pathSummary);
 
   useIonViewDidEnter(() => {
     // no-op placeholder kept for parity with CollectionPage's refresh-on-enter pattern;
@@ -145,6 +148,11 @@ const LearningPathPage: React.FC = () => {
                     progressPct={lp.progress.pct}
                     doneLevels={lp.progress.doneLevels}
                     batchEndDate={lp.enrollment.batchEndDate}
+                    skillCounts={
+                      pathSkills.isLoading || !pathSkills.summary
+                        ? undefined
+                        : { held: pathSkills.summary.held, total: pathSkills.summary.total }
+                    }
                     t={t}
                   />
                   <LPLedger
@@ -161,6 +169,8 @@ const LearningPathPage: React.FC = () => {
                     onOpenOutcome={lp.model.outcomeAssessment ? goOutcome : undefined}
                     onOpenLevel={goLevel}
                     onOpenCourse={openCourse}
+                    heldCodes={pathSkills.heldCodes}
+                    skillName={pathSkills.name}
                     t={t}
                   />
                   <LPCertificateCard
@@ -199,7 +209,7 @@ const LearningPathPage: React.FC = () => {
                     </div>
                     <div className="lp-progress-stat">
                       <span className="lp-progress-stat-label">{t('learningPath.skills')}</span>
-                      <span className="lp-progress-stat-value">{lp.model.allSkills.length}</span>
+                      <span className="lp-progress-stat-value">{lp.model.allSkillCodes.length || lp.model.allSkills.length}</span>
                     </div>
                   </div>
 

@@ -10,6 +10,7 @@ const course: LPCourseNode = {
   leafNodesCount: 3,
   leafIds: ['a', 'b', 'c'],
   skills: [],
+  skillCodes: [],
   isAssessmentCourse: false,
 };
 
