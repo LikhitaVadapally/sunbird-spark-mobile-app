@@ -8,7 +8,8 @@ import { useSkillLabels, useSkillProfile } from './useSkillProfile';
 import { buildCourseSummaryMapForContext, getPathSummary, parseCourseContextId } from '../services/viewer/summaryMapper';
 import { parseLearningPath } from '../services/learningPath/learningPathMapper';
 import { buildPathSkillSummary } from '../services/learningPath/skillAggregation';
-import { aggregateMySkills, buildMySkills, heldCodeSet } from '../services/skill/mySkills';
+import { aggregateMySkills, buildMySkills, heldCodeSet, withSourceNames } from '../services/skill/mySkills';
+import { withSkillCodes } from '../services/skill/skillCodes';
 import { isLearningPathCategory } from '../utils/isLearningPath';
 import type { PathSkillSummary, SkillAggregate } from '../services/learningPath/skillAggregation';
 import type { MySkillEntry } from '../services/skill/mySkills';
@@ -96,18 +97,35 @@ export function useMySkills(options?: { enabled?: boolean }): UseMySkillsResult 
     queries: paths.map((path) => ({ ...collectionHierarchyQueryOptions(path.pathId), enabled })),
   });
 
+  const models = useMemo(
+    () =>
+      hierarchyQueries.map((query) => {
+        const root = (query?.data as CollectionData | null | undefined)?.hierarchyRoot;
+        return root ? parseLearningPath(root) : null;
+      }),
+    [hierarchyQueries]
+  );
+
+  // Every framework in play: the profile's for gained names, each path's for its tags.
+  const frameworkIds = useMemo(
+    () => [
+      ...profile.frameworkIds,
+      ...models.map((m) => m?.competencyFramework).filter((id): id is string => Boolean(id)),
+    ],
+    [profile.frameworkIds, models]
+  );
+  const { labelOf, codeOf, isLoading: labelsLoading } = useSkillLabels(enabled ? frameworkIds : []);
+
   const entries = useMemo<MySkillsEntry[]>(
     () =>
       paths.map((path, i) => {
         const query = hierarchyQueries[i];
-        const data = query?.data as CollectionData | null | undefined;
-        const hierarchyRoot = data?.hierarchyRoot ?? null;
+        const model = models[i];
 
-        if (!hierarchyRoot) {
+        if (!model) {
           return { path, isLoading: !!query?.isLoading || summaryLoading, isError: !!query?.isError };
         }
 
-        const model = parseLearningPath(hierarchyRoot);
         const pathSummary = getPathSummary(summaryRecords, path.pathId, path.contextId);
         // Scoped per path, NOT a single shared `indexSummaryByCollectionId` map:
         // that one is unscoped ("later records win on duplicate keys"), so when
@@ -115,28 +133,38 @@ export function useMySkills(options?: { enabled?: boolean }): UseMySkillsResult 
         // other's skill summary. Matches what `useLearningPath` does for the
         // equivalent single-path computation.
         const summaryByCollectionId = buildCourseSummaryMapForContext(summaryRecords, path.contextId);
-        const summary = buildPathSkillSummary(model, pathSummary, summaryByCollectionId, path.contextId);
+        // USF paths are tagged by skill NAME; the profile holds codes. Match on codes.
+        const summary = buildPathSkillSummary(
+          withSkillCodes(model, codeOf),
+          pathSummary,
+          summaryByCollectionId,
+          path.contextId
+        );
         return { path, summary, isLoading: false, isError: false };
       }),
-    [paths, hierarchyQueries, summaryRecords, summaryLoading]
+    [paths, hierarchyQueries, models, codeOf, summaryRecords, summaryLoading]
   );
 
   const summaries = useMemo(
     () => entries.map((e) => e.summary).filter((s): s is PathSkillSummary => !!s),
     [entries]
   );
-  const skills = useMemo(() => buildMySkills(profile.skills, summaries), [profile.skills, summaries]);
+  // Evidence names its course by id; the enrolment list already has the names.
+  const courseNames = useMemo(
+    () =>
+      new Map(
+        (enrolments.data?.data?.courses ?? [])
+          .filter((c) => c.content?.name)
+          .map((c) => [c.courseId, c.content?.name ?? ''] as const)
+      ),
+    [enrolments.data]
+  );
+  const skills = useMemo(
+    () => withSourceNames(buildMySkills(profile.skills, summaries), courseNames),
+    [profile.skills, summaries, courseNames]
+  );
   const heldCodes = useMemo(() => heldCodeSet(profile.skills), [profile.skills]);
   const aggregate = useMemo(() => aggregateMySkills(skills, summaries), [skills, summaries]);
-
-  const frameworkIds = useMemo(
-    () => [
-      ...profile.frameworkIds,
-      ...summaries.map((s) => s.frameworkId).filter((id): id is string => Boolean(id)),
-    ],
-    [profile.frameworkIds, summaries]
-  );
-  const { labelOf, isLoading: labelsLoading } = useSkillLabels(enabled ? frameworkIds : []);
 
   return {
     entries,

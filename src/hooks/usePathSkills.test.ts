@@ -11,7 +11,11 @@ vi.mock('./useSkillProfile', () => ({
   useSkillProfile: () => ({ skills: mockHeld, frameworkIds: ['profile_fw'], isLoading: false, isError: false }),
   useSkillLabels: (ids: string[]) => {
     labelIds.push(ids);
-    return { labelOf: (code: string, fw?: string) => ({ name: `${fw}:${code}`, resolved: true }), isLoading: false };
+    return {
+      labelOf: (code: string, fw?: string) => ({ name: `${fw}:${code}`, resolved: true }),
+      codeOf: (tag: string) => tag,
+      isLoading: false,
+    };
   },
 }));
 

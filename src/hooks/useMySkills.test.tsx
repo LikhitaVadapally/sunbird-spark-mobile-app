@@ -28,6 +28,8 @@ vi.mock('./useViewerSummary', () => ({
 }));
 
 let mockHeld: HeldSkill[] = [];
+// USF names -> codes, as the framework vocabulary would resolve them.
+const USF_CODES: Record<string, string> = { 'python programming': 'pp', 'java programming': 'jp', javascript: 'js' };
 let mockProfileError = false;
 const profileEnabled: Array<boolean | undefined> = [];
 vi.mock('./useSkillProfile', () => ({
@@ -37,6 +39,7 @@ vi.mock('./useSkillProfile', () => ({
   },
   useSkillLabels: () => ({
     labelOf: (code: string) => ({ name: code, resolved: false }),
+    codeOf: (tag: string) => USF_CODES[tag.toLowerCase()] ?? tag,
     isLoading: false,
   }),
 }));
@@ -116,6 +119,35 @@ describe('useMySkills', () => {
     expect(summary?.taughtCodes.length).toBeGreaterThan(0);
     expect(result.current.skills.every((s) => !s.gained)).toBe(true);
     expect(result.current.aggregate.pendingSkills).toBe(summary?.unfinishedCodes.length);
+  });
+
+  // USF paths are tagged by NAME; the profile holds the CODE the skill service awarded.
+  it('matches a USF path tag to the held code, so an earned skill is gained, not pending', async () => {
+    mockCourses = [learningPathEnrollment()];
+    mockHeld = [{ skillId: 'pp', frameworkId: 'USF', sourceType: 'COURSE', evidence: [] }];
+    const { result } = renderHook(() => useMySkills(), { wrapper });
+    await waitFor(() => expect(result.current.analyzedCount).toBe(1));
+
+    expect(result.current.entries[0]?.summary?.taughtCodes).toEqual(expect.arrayContaining(['pp', 'jp', 'js']));
+    const pp = result.current.skills.filter((s) => s.code === 'pp');
+    expect(pp).toEqual([expect.objectContaining({ gained: true })]);
+    expect(result.current.skills.some((s) => s.code === 'Python Programming')).toBe(false);
+  });
+
+  it('names course evidence by the course, not its id', () => {
+    mockCourses = [
+      learningPathEnrollment({ courseId: 'do_course', content: { primaryCategory: 'Course', name: 'skill course' } }),
+    ];
+    mockHeld = [
+      {
+        skillId: 'dv',
+        frameworkId: 'USF',
+        sourceType: 'COURSE',
+        evidence: [{ evidenceId: 'e1', sourceType: 'COURSE', sourceId: 'do_course', revoked: false }],
+      },
+    ];
+    const { result } = renderHook(() => useMySkills(), { wrapper });
+    expect(result.current.skills[0]?.evidence[0]?.sourceName).toBe('skill course');
   });
 
   // The My Learning card passes `enabled: false` on the Courses tab - no profile read then.

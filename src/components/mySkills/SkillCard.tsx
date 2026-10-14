@@ -105,7 +105,7 @@ export const SkillCard: React.FC<SkillCardProps> = ({ entry, label, isExpanded, 
                     {evidence.map((ev) => (
                       <li key={ev.evidenceId}>
                         <span className="ms-skill-card-evidence-kind">{sourceLabel(toSourceKind(ev.sourceType))}</span>
-                        {ev.sourceId && <span className="ms-skill-card-evidence-id">{ev.sourceId}</span>}
+                        {ev.sourceId && <span className="ms-skill-card-evidence-id">{ev.sourceName ?? ev.sourceId}</span>}
                         {typeof ev.score === 'number' && typeof ev.maxScore === 'number' && (
                           <>
                             <Dot />

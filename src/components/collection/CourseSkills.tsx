@@ -3,7 +3,7 @@ import { useSkillLabels, useSkillProfile } from '../../hooks/useSkillProfile';
 import { CheckIcon } from '../icons/CollectionIcons';
 
 interface CourseSkillsProps {
-  /** The course's tagged skill codes (see `services/skill/skillSource.ts`). */
+  /** The course's skill tags (see `services/skill/skillSource.ts`): codes, or USF names. */
   codes: string[];
   t: (key: string) => string;
 }
@@ -18,7 +18,7 @@ interface CourseSkillsProps {
  */
 const CourseSkills: React.FC<CourseSkillsProps> = ({ codes, t }) => {
   const profile = useSkillProfile();
-  const { labelOf, isLoading: labelsLoading } = useSkillLabels(profile.frameworkIds);
+  const { labelOf, codeOf, isLoading: labelsLoading } = useSkillLabels(profile.frameworkIds);
 
   if (codes.length === 0) return null;
   if (profile.isLoading || labelsLoading) return null;
@@ -27,10 +27,12 @@ const CourseSkills: React.FC<CourseSkillsProps> = ({ codes, t }) => {
     <div className="cp-skills-section" data-testid="course-skills">
       <h2 className="cp-section-title">{t('collection.youWillLearn')}</h2>
       <ul className="cp-check-list">
-        {codes.map((code) => {
+        {codes.map((tag) => {
+          // A USF course is tagged by name ("Data Visualization"); the profile holds the code.
+          const code = codeOf(tag);
           const held = profile.heldCodes.has(code);
           return (
-            <li key={code} data-held={held}>
+            <li key={tag} data-held={held}>
               <span className="cp-skill-icon-slot" aria-hidden="true">
                 {held && <CheckIcon />}
               </span>

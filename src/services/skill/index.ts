@@ -20,4 +20,6 @@ export {
   type TaxonomyFrameworkResponse,
 } from './skillTree';
 
+export { toSkillCode, withSkillCodes, type CodeOf } from './skillCodes';
+
 export { skillSource } from './skillSource';
