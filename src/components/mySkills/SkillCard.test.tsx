@@ -41,10 +41,55 @@ describe('SkillCard', () => {
     render(<SkillCard entry={gained} label={label} isExpanded onToggle={vi.fn()} onOpenPath={onOpenPath} t={t} />);
     expect(screen.getByText('mySkills.howEarned')).toBeInTheDocument();
     expect(screen.getByText('mySkills.source.assessment')).toBeInTheDocument();
-    expect(screen.getByText('8/10')).toBeInTheDocument();
+    expect(screen.queryByText('8/10')).not.toBeInTheDocument();
+    expect(screen.queryByText('do_assess')).not.toBeInTheDocument();
     expect(screen.getByText('mySkills.alsoTaughtIn')).toBeInTheDocument();
     fireEvent.click(screen.getByText('ICU Nurse Induction'));
     expect(onOpenPath).toHaveBeenCalledWith(gained.paths[0]);
+  });
+
+  it('shows the path an assessment was earned in as its own link, not under "also taught in"', () => {
+    const icu = { pathId: 'lp1', contextId: 'b1', pathName: 'ICU Nurse Induction' };
+    const entry: MySkillEntry = {
+      ...gained,
+      evidence: [{ evidenceId: 'e1', sourceType: 'ASSESSMENT', sourceId: 'do_assess', sourcePath: icu, revoked: false }],
+      paths: [],
+    };
+    const onOpenPath = vi.fn();
+    render(<SkillCard entry={entry} label={label} isExpanded onToggle={vi.fn()} onOpenPath={onOpenPath} t={t} />);
+    expect(screen.getByTestId('skill-evidence-path')).toHaveTextContent('mySkills.earnedIn');
+    expect(screen.queryByText('mySkills.alsoTaughtIn')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('ICU Nurse Induction'));
+    expect(onOpenPath).toHaveBeenCalledWith(icu);
+  });
+
+  it('keeps an outside certificate id, and names a known source', () => {
+    const entry: MySkillEntry = {
+      ...gained,
+      evidence: [
+        { evidenceId: 'e1', sourceType: 'EXTERNAL', sourceId: 'nrp-cert-42', revoked: false },
+        { evidenceId: 'e2', sourceType: 'COURSE', sourceId: 'do_c', sourceName: 'usf skill test', revoked: false },
+      ],
+    };
+    render(<SkillCard entry={entry} label={label} isExpanded onToggle={vi.fn()} onOpenPath={vi.fn()} t={t} />);
+    expect(screen.getByText('nrp-cert-42')).toBeInTheDocument();
+    expect(screen.getByText('usf skill test')).toBeInTheDocument();
+  });
+
+  // The header already says "Course · 2 Sep": the row says only what it does not.
+  it('does not repeat the source or date the header already shows', () => {
+    const entry: MySkillEntry = {
+      ...gained,
+      evidence: [
+        { evidenceId: 'e1', sourceType: 'COURSE', sourceId: 'do_c', sourceName: 'usf skill test', occurredOn: gained.gainedAt, revoked: false },
+      ],
+    };
+    render(<SkillCard entry={entry} label={label} isExpanded onToggle={vi.fn()} onOpenPath={vi.fn()} t={t} />);
+    expect(screen.getByText('usf skill test')).toBeInTheDocument();
+    expect(screen.queryAllByText('mySkills.source.course')).toHaveLength(1);
+    expect(screen.getByTestId('skill-evidence')).not.toHaveTextContent(
+      new Date(gained.gainedAt ?? 0).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })
+    );
   });
 
   it('lists the paths a pending skill is still to do in', () => {

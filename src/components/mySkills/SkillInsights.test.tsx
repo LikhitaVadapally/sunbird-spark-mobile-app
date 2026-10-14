@@ -8,12 +8,11 @@ const entry = (code: string, extra: Partial<MySkillEntry> = {}): MySkillEntry =>
 
 describe('SkillInsights', () => {
   it('renders nothing with no insights', () => {
-    const { container } = render(<SkillInsights recentlyGained={[]} mostReinforced={[]} nameOf={(e) => e.code} onSelectSkill={vi.fn()} t={t} />);
+    const { container } = render(<SkillInsights mostReinforced={[]} nameOf={(e) => e.code} onSelectSkill={vi.fn()} t={t} />);
     expect(container.innerHTML).toBe('');
   });
 
-  it('lists recently gained and most reinforced skills, and selects one on tap', () => {
-    const recent = entry('a', { gainedAt: Date.now() });
+  it('lists most reinforced skills, and selects one on tap', () => {
     const reinforced = entry('b', {
       paths: [
         { pathId: 'p1', pathName: 'P1' },
@@ -22,9 +21,8 @@ describe('SkillInsights', () => {
     });
     const onSelectSkill = vi.fn();
     render(
-      <SkillInsights recentlyGained={[recent]} mostReinforced={[reinforced]} nameOf={(e) => e.code.toUpperCase()} onSelectSkill={onSelectSkill} t={t} />
+      <SkillInsights mostReinforced={[reinforced]} nameOf={(e) => e.code.toUpperCase()} onSelectSkill={onSelectSkill} t={t} />
     );
-    expect(screen.getByText('mySkills.today')).toBeInTheDocument();
     expect(screen.getByText('mySkills.pathCount:{"count":2}')).toBeInTheDocument();
     fireEvent.click(screen.getByText('B'));
     expect(onSelectSkill).toHaveBeenCalledWith(reinforced);

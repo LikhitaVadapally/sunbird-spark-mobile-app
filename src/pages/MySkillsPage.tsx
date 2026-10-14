@@ -6,7 +6,7 @@ import { useMySkills } from '../hooks/useMySkills';
 import { useSkillSuggestions } from '../hooks/useSkillSuggestions';
 import { getLearningPathStatusPath } from '../utils/getContentDetailPath';
 import { filterPathSummaries } from '../services/learningPath/skillAggregation';
-import { filterMySkills, getMostReinforcedSkills, getRecentlyGainedSkills } from '../services/skill/mySkills';
+import { filterMySkills, getMostReinforcedSkills } from '../services/skill/mySkills';
 import { BackIcon } from '../components/icons/CollectionIcons';
 import PageLoader from '../components/common/PageLoader';
 import MySkillsHero from '../components/mySkills/MySkillsHero';
@@ -65,7 +65,6 @@ const MySkillsPage: React.FC = () => {
   const labelOfEntry = (entry: MySkillEntry) => labelOf(entry.code, entry.frameworkId);
   const nameOf = (code: string, frameworkId?: string) => labelOf(code, frameworkId).name;
 
-  const recentlyGained = useMemo(() => getRecentlyGainedSkills(skills), [skills]);
   const mostReinforced = useMemo(() => getMostReinforcedSkills(skills), [skills]);
 
   const enrolledPathIds = useMemo(() => entries.map((entry) => entry.path.pathId), [entries]);
@@ -198,7 +197,6 @@ const MySkillsPage: React.FC = () => {
 
               {!labelsLoading && (
                 <SkillInsights
-                  recentlyGained={recentlyGained}
                   mostReinforced={mostReinforced}
                   nameOf={(entry) => labelOfEntry(entry).name}
                   onSelectSkill={selectSkillFromInsights}

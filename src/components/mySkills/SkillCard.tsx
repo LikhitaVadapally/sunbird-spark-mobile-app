@@ -2,8 +2,9 @@ import React from 'react';
 import { IonIcon } from '@ionic/react';
 import { checkmark, chevronDownOutline, lockClosedOutline } from 'ionicons/icons';
 import { toSourceKind } from '../../services/skill/mySkills';
-import type { MySkillEntry, SkillPathRef } from '../../services/skill/mySkills';
+import type { MySkillEntry, SkillPathRef, SkillSourceKind } from '../../services/skill/mySkills';
 import type { SkillLabel } from '../../services/skill';
+import type { SkillEvidence } from '../../types/skillServiceTypes';
 import type { LPTFunction } from '../learningPath/lpTFunction';
 
 interface SkillCardProps {
@@ -18,6 +19,31 @@ interface SkillCardProps {
 function formatSkillDate(ms: number | undefined): string {
   if (!ms) return '';
   return new Date(ms).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+/**
+ * What to call an evidence source. A content id means nothing to a learner, so an unnamed one is
+ * left out; an outside certificate's id is its certificate number, so that one stays. A path's own
+ * name is not repeated here - the path line below already shows it.
+ */
+function evidenceName(ev: SkillEvidence): string | undefined {
+  if (ev.sourcePath && ev.sourcePath.pathId === ev.sourceId) return undefined;
+  if (ev.sourceName) return ev.sourceName;
+  return toSourceKind(ev.sourceType) === 'external' && ev.sourceId ? ev.sourceId : undefined;
+}
+
+/**
+ * One evidence row, minus what the card header already says. The header shows the skill's source
+ * and date, so a row repeats them only where they differ - which happens when several pieces of
+ * evidence back one skill. A row with nothing else to show keeps its kind.
+ */
+function evidenceRow(ev: SkillEvidence, entry: MySkillEntry): { kind?: SkillSourceKind; name?: string; date?: string } {
+  const kind = toSourceKind(ev.sourceType);
+  const name = evidenceName(ev);
+  const date = formatSkillDate(ev.occurredOn);
+  const showDate = Boolean(date) && date !== formatSkillDate(entry.gainedAt);
+  const showKind = kind !== entry.source || (!name && !showDate && !ev.sourcePath);
+  return { ...(showKind ? { kind } : {}), ...(name ? { name } : {}), ...(showDate ? { date } : {}) };
 }
 
 const Dot: React.FC = () => <span className="ms-skill-card-dot" aria-hidden="true">·</span>;
@@ -102,26 +128,32 @@ export const SkillCard: React.FC<SkillCardProps> = ({ entry, label, isExpanded, 
                   <p className="ms-skill-card-muted">{t('mySkills.noEvidence')}</p>
                 ) : (
                   <ul className="ms-skill-card-evidence">
-                    {evidence.map((ev) => (
-                      <li key={ev.evidenceId}>
-                        <span className="ms-skill-card-evidence-kind">{sourceLabel(toSourceKind(ev.sourceType))}</span>
-                        {ev.sourceId && <span className="ms-skill-card-evidence-id">{ev.sourceName ?? ev.sourceId}</span>}
-                        {typeof ev.score === 'number' && typeof ev.maxScore === 'number' && (
-                          <>
-                            <Dot />
-                            <span>
-                              {ev.score}/{ev.maxScore}
-                            </span>
-                          </>
-                        )}
-                        {ev.occurredOn !== undefined && (
-                          <>
-                            <Dot />
-                            <span>{formatSkillDate(ev.occurredOn)}</span>
-                          </>
-                        )}
-                      </li>
-                    ))}
+                    {evidence.map((ev) => {
+                      const row = evidenceRow(ev, entry);
+                      const earnedIn = ev.sourcePath;
+                      return (
+                        <li key={ev.evidenceId}>
+                          <div className="ms-skill-card-evidence-row">
+                            {row.kind && <span className="ms-skill-card-evidence-kind">{sourceLabel(row.kind)}</span>}
+                            {row.name && <span className="ms-skill-card-evidence-kind ms-skill-card-evidence-id">{row.name}</span>}
+                            {row.date && (
+                              <>
+                                {(row.kind || row.name) && <Dot />}
+                                <span>{row.date}</span>
+                              </>
+                            )}
+                          </div>
+                          {earnedIn && (
+                            <div className="ms-skill-card-evidence-row" data-testid="skill-evidence-path">
+                              <span>{t('mySkills.earnedIn')}</span>
+                              <button type="button" className="ms-skill-card-path-link" onClick={() => onOpenPath(earnedIn)}>
+                                {earnedIn.pathName}
+                              </button>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>

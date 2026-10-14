@@ -272,9 +272,6 @@
   white-space: nowrap;
 }
 
-.ms-insight-name--gained {
-  color: #3f5730;
-}
 
 .ms-insight-meta {
   flex-shrink: 0;
@@ -485,6 +482,12 @@
 }
 
 .ms-skill-card-evidence li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.ms-skill-card-evidence-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
